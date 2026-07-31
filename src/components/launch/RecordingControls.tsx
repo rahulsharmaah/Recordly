@@ -1,4 +1,4 @@
-import { MicrophoneIcon, MicrophoneSlashIcon, MinusIcon, PauseIcon, PlayIcon, SquareIcon, XIcon } from "@phosphor-icons/react";
+import { MicrophoneIcon, MicrophoneSlashIcon, MinusIcon, PauseIcon, PencilSimpleLineIcon, PlayIcon, SquareIcon, XIcon } from "@phosphor-icons/react";
 import { useMemo } from "react";
 import { useScopedT } from "@/contexts/I18nContext";
 import { Button } from "@/components/ui/button";
@@ -77,6 +77,18 @@ export const RecordingControls = ({
 				</span>
 
 				<Separator orientation="vertical" className="mx-[5px] h-6" />
+
+				<Button
+					variant="ghost"
+					size="icon"
+					iconSize="lg"
+					onClick={() => window.electronAPI?.annotationOverlayOpen?.()}
+					title="Draw temporary highlight"
+					aria-label="Draw temporary highlight"
+					className={styles.ibActive}
+				>
+					<PencilSimpleLineIcon size={18} />
+				</Button>
 
 				<Button
 					variant={paused ? "default" : "ghost"}

@@ -35,6 +35,7 @@ let hudOverlaySourceSelectionActive = false;
 let hudOverlayMouseReassertTimer: NodeJS.Timeout | null = null;
 let hudOverlayRecordingActive = false;
 let hudOverlayWebcamPreviewVisible = false;
+let annotationOverlayWindow: BrowserWindow | null = null;
 let countdownWindow: BrowserWindow | null = null;
 let updateToastWindow: BrowserWindow | null = null;
 
@@ -616,6 +617,62 @@ export function createHudOverlayWindow(): BrowserWindow {
 
 export function getHudOverlayWindow(): BrowserWindow | null {
 	return hudOverlayWindow && !hudOverlayWindow.isDestroyed() ? hudOverlayWindow : null;
+}
+
+export function showAnnotationOverlay(): void {
+	if (annotationOverlayWindow && !annotationOverlayWindow.isDestroyed()) {
+		annotationOverlayWindow.show();
+		annotationOverlayWindow.moveTop();
+		annotationOverlayWindow.focus();
+		return;
+	}
+
+	const hudBounds = getHudOverlayWindow()?.getBounds();
+	const display = hudBounds
+		? getScreen().getDisplayNearestPoint({ x: hudBounds.x, y: hudBounds.y })
+		: getScreen().getPrimaryDisplay();
+	const bounds = display.bounds;
+	const win = new BrowserWindow({
+		x: bounds.x,
+		y: bounds.y,
+		width: bounds.width,
+		height: bounds.height,
+		frame: false,
+		transparent: true,
+		backgroundColor: "#00000000",
+		alwaysOnTop: true,
+		skipTaskbar: true,
+		hasShadow: false,
+		resizable: false,
+		focusable: true,
+		webPreferences: {
+			preload: path.join(electronWindowsDir, "preload.mjs"),
+			nodeIntegration: false,
+			contextIsolation: true,
+			backgroundThrottling: false,
+		},
+	});
+
+	annotationOverlayWindow = win;
+	win.on("closed", () => {
+		if (annotationOverlayWindow === win) annotationOverlayWindow = null;
+		reassertHudOverlayMousePassthrough();
+	});
+	if (VITE_DEV_SERVER_URL) {
+		win.loadURL(`${VITE_DEV_SERVER_URL}?windowType=annotation-overlay`);
+	} else {
+		win.loadFile(path.join(RENDERER_DIST, "index.html"), {
+			query: { windowType: "annotation-overlay" },
+		});
+	}
+}
+
+export function closeAnnotationOverlay(): void {
+	annotationOverlayWindow?.close();
+}
+
+export function setAnnotationOverlayIgnoreMouse(ignore: boolean): void {
+	annotationOverlayWindow?.setIgnoreMouseEvents(ignore, { forward: true });
 }
 
 /**

@@ -19,7 +19,10 @@ import {
 import { moveFileWithOverwrite } from "../utils";
 import { emitRecordingInterrupted } from "./events";
 
-const WINDOWS_CAPTURE_STOP_TIMEOUT_MS = 45_000;
+// A stuck camera or audio driver must not leave the recording HUD unresponsive
+// for nearly a minute. The caller can recover a valid partial recording after
+// this bounded stop attempt.
+const WINDOWS_CAPTURE_STOP_TIMEOUT_MS = 15_000;
 
 export type NativeWindowsVideoPaddingResult = {
 	padded: boolean;

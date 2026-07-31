@@ -52,12 +52,15 @@ import {
 	createEditorWindow,
 	createHudOverlayWindow,
 	createSourceSelectorWindow,
+	closeAnnotationOverlay,
 	getHudOverlayWindow,
 	getUpdateToastWindow,
 	hideUpdateToastWindow,
 	isHudOverlayMousePassthroughSupported,
 	reassertHudOverlayMousePassthrough as reassertHudOverlayMouseState,
 	setHudOverlayRecordingActive,
+	setAnnotationOverlayIgnoreMouse,
+	showAnnotationOverlay,
 	showUpdateToastWindow,
 } from "./windows";
 
@@ -1001,6 +1004,12 @@ app.whenReady().then(async () => {
 				app.quit();
 			}
 		}, 100);
+	});
+
+	ipcMain.on("annotation-overlay-open", () => showAnnotationOverlay());
+	ipcMain.on("annotation-overlay-close", () => closeAnnotationOverlay());
+	ipcMain.on("annotation-overlay-set-ignore-mouse", (_event, ignore: boolean) => {
+		setAnnotationOverlayIgnoreMouse(Boolean(ignore));
 	});
 	syncDockIcon();
 	createTray();
