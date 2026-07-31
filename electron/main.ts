@@ -385,6 +385,27 @@ function isEditorWindow(window: BrowserWindow) {
 	return window.webContents.getURL().includes("windowType=editor");
 }
 
+/**
+ * Hide the Recordly editor from screen capture while a recording is running.
+ *
+ * The editor is an ordinary window, so recording a full screen captures it too
+ * — the user ends up with Recordly's own timeline and preview burned into the
+ * footage. Content protection is toggled rather than left permanently on so
+ * the editor is still capturable outside of recording (screen shares, demos of
+ * Recordly itself).
+ */
+function setEditorWindowsHiddenFromCapture(hidden: boolean) {
+	if (process.platform === "linux") {
+		return;
+	}
+
+	for (const window of BrowserWindow.getAllWindows()) {
+		if (!window.isDestroyed() && isEditorWindow(window)) {
+			window.setContentProtection(hidden);
+		}
+	}
+}
+
 function sendEditorMenuAction(
 	channel: "menu-load-project" | "menu-save-project" | "menu-save-project-as",
 ) {
@@ -1040,6 +1061,7 @@ app.whenReady().then(async () => {
 		(recording: boolean, sourceName: string) => {
 			selectedSourceName = sourceName;
 			setHudOverlayRecordingActive(recording);
+			setEditorWindowsHiddenFromCapture(recording);
 			if (!tray) createTray();
 			updateTrayMenu(recording);
 			if (recording) {

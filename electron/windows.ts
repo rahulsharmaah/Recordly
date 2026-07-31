@@ -744,6 +744,14 @@ export function showAnnotationOverlay(): void {
 		},
 	});
 
+	// Keep the annotation UI out of the captured video. Without this the
+	// toolbar, spotlight dimming and the drawings themselves are burned into
+	// the recording, which defeats the point of an overlay the presenter uses
+	// live. Mirrors the HUD's own capture protection.
+	if (isHudOverlayCaptureProtectionSupported()) {
+		win.setContentProtection(true);
+	}
+
 	annotationOverlayWindow = win;
 	win.on("show", keepHudOverlayReachableAboveAnnotationOverlay);
 	win.on("focus", keepHudOverlayReachableAboveAnnotationOverlay);

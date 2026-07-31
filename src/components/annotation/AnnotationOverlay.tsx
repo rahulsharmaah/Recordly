@@ -115,6 +115,40 @@ function widthFor(
 	return Math.max(min, Math.min(base * 1.15, width));
 }
 
+// The highlighter is translucent, so stroking it segment-by-segment makes
+// every overlapping round cap composite against itself and the stroke reads as
+// a chain of dark blobs. Building one continuous path and stroking it a single
+// time keeps the alpha perfectly uniform along the whole mark.
+function paintUniformStrokePath(
+	ctx: CanvasRenderingContext2D,
+	color: string,
+	points: Point[],
+	lineWidth: number,
+) {
+	if (points.length === 0) return;
+	ctx.strokeStyle = color;
+	ctx.fillStyle = color;
+	ctx.lineWidth = lineWidth;
+	ctx.lineCap = "round";
+	ctx.lineJoin = "round";
+	if (points.length === 1) {
+		ctx.beginPath();
+		ctx.arc(points[0].x, points[0].y, Math.max(1, lineWidth / 2), 0, Math.PI * 2);
+		ctx.fill();
+		return;
+	}
+	ctx.beginPath();
+	ctx.moveTo(points[0].x, points[0].y);
+	for (let index = 1; index < points.length - 1; index += 1) {
+		const current = points[index];
+		const next = points[index + 1];
+		ctx.quadraticCurveTo(current.x, current.y, (current.x + next.x) / 2, (current.y + next.y) / 2);
+	}
+	const last = points[points.length - 1];
+	ctx.lineTo(last.x, last.y);
+	ctx.stroke();
+}
+
 function paintStrokePath(ctx: CanvasRenderingContext2D, color: string, points: Point[], widths: number[]) {
 	if (points.length === 0) return;
 	ctx.strokeStyle = color;
@@ -210,10 +244,11 @@ function paintMark(ctx: CanvasRenderingContext2D, mark: Mark, fadeOpacity: numbe
 		if (mark.tool === "highlighter") {
 			ctx.globalCompositeOperation = "multiply";
 			ctx.globalAlpha = 0.5 * fadeOpacity * mark.baseOpacity;
+			paintUniformStrokePath(ctx, mark.color, mark.points, mark.widths[0]);
 		} else {
 			ctx.globalAlpha = fadeOpacity * mark.baseOpacity;
+			paintStrokePath(ctx, mark.color, mark.points, mark.widths);
 		}
-		paintStrokePath(ctx, mark.color, mark.points, mark.widths);
 	} else if (mark.kind === "shape") {
 		ctx.globalAlpha = fadeOpacity * mark.baseOpacity;
 		paintShape(ctx, mark);
@@ -608,18 +643,16 @@ export function AnnotationOverlay() {
 				stroke.points.push(point);
 				stroke.widths.push(width);
 				const mid: Point = { x: (stroke.prevRaw.x + point.x) / 2, y: (stroke.prevRaw.y + point.y) / 2, t: point.t };
-				if (ctx) {
+				// The highlighter must be repainted as one whole path (below)
+				// rather than appended to, so only opaque tools draw the new
+				// segment incrementally here.
+				if (ctx && stroke.tool !== "highlighter") {
 					ctx.save();
 					ctx.strokeStyle = stroke.color;
 					ctx.lineCap = "round";
 					ctx.lineJoin = "round";
 					ctx.lineWidth = width;
-					if (stroke.tool === "highlighter") {
-						ctx.globalCompositeOperation = "multiply";
-						ctx.globalAlpha = 0.5 * stroke.opacity;
-					} else {
-						ctx.globalAlpha = stroke.opacity;
-					}
+					ctx.globalAlpha = stroke.opacity;
 					ctx.beginPath();
 					ctx.moveTo(stroke.lastMid.x, stroke.lastMid.y);
 					ctx.quadraticCurveTo(stroke.prevRaw.x, stroke.prevRaw.y, mid.x, mid.y);
@@ -628,6 +661,14 @@ export function AnnotationOverlay() {
 				}
 				stroke.lastMid = mid;
 				stroke.prevRaw = point;
+			}
+			if (ctx && stroke.tool === "highlighter") {
+				clearActiveCanvas();
+				ctx.save();
+				ctx.globalCompositeOperation = "multiply";
+				ctx.globalAlpha = 0.5 * stroke.opacity;
+				paintUniformStrokePath(ctx, stroke.color, stroke.points, stroke.widths[0]);
+				ctx.restore();
 			}
 			return;
 		}
