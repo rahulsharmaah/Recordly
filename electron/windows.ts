@@ -40,6 +40,10 @@ let countdownWindow: BrowserWindow | null = null;
 let updateToastWindow: BrowserWindow | null = null;
 
 const HUD_OVERLAY_SETTINGS_FILE = path.join(USER_DATA_PATH, "hud-overlay-settings.json");
+const ANNOTATION_OVERLAY_SETTINGS_FILE = path.join(
+	USER_DATA_PATH,
+	"annotation-overlay-settings.json",
+);
 const HUD_EDGE_MARGIN_DIP = 16;
 const UPDATE_TOAST_WIDTH = 456;
 const UPDATE_TOAST_HEIGHT = 252;
@@ -618,6 +622,76 @@ export function createHudOverlayWindow(): BrowserWindow {
 export function getHudOverlayWindow(): BrowserWindow | null {
 	return hudOverlayWindow && !hudOverlayWindow.isDestroyed() ? hudOverlayWindow : null;
 }
+
+export interface AnnotationOverlaySettings {
+	tool: string;
+	color: string;
+	sizeScale: number;
+	opacity: number;
+}
+
+const DEFAULT_ANNOTATION_OVERLAY_SETTINGS: AnnotationOverlaySettings = {
+	tool: "brush",
+	color: "#ff3b5c",
+	sizeScale: 1,
+	opacity: 1,
+};
+
+let annotationOverlaySettingsCache: AnnotationOverlaySettings | null = null;
+
+function loadAnnotationOverlaySettings(): AnnotationOverlaySettings {
+	if (annotationOverlaySettingsCache) {
+		return annotationOverlaySettingsCache;
+	}
+
+	try {
+		if (fs.existsSync(ANNOTATION_OVERLAY_SETTINGS_FILE)) {
+			const raw = fs.readFileSync(ANNOTATION_OVERLAY_SETTINGS_FILE, "utf-8");
+			const parsed = JSON.parse(raw) as Partial<AnnotationOverlaySettings>;
+			annotationOverlaySettingsCache = {
+				tool:
+					typeof parsed.tool === "string" ? parsed.tool : DEFAULT_ANNOTATION_OVERLAY_SETTINGS.tool,
+				color:
+					typeof parsed.color === "string"
+						? parsed.color
+						: DEFAULT_ANNOTATION_OVERLAY_SETTINGS.color,
+				sizeScale:
+					typeof parsed.sizeScale === "number"
+						? parsed.sizeScale
+						: DEFAULT_ANNOTATION_OVERLAY_SETTINGS.sizeScale,
+				opacity:
+					typeof parsed.opacity === "number"
+						? parsed.opacity
+						: DEFAULT_ANNOTATION_OVERLAY_SETTINGS.opacity,
+			};
+			return annotationOverlaySettingsCache;
+		}
+	} catch {
+		// Ignore settings read failures and fall back to defaults.
+	}
+
+	annotationOverlaySettingsCache = { ...DEFAULT_ANNOTATION_OVERLAY_SETTINGS };
+	return annotationOverlaySettingsCache;
+}
+
+function persistAnnotationOverlaySettings(settings: AnnotationOverlaySettings): void {
+	annotationOverlaySettingsCache = settings;
+	try {
+		fs.writeFileSync(ANNOTATION_OVERLAY_SETTINGS_FILE, JSON.stringify(settings, null, 2), "utf-8");
+	} catch {
+		// Ignore settings write failures and keep runtime state working.
+	}
+}
+
+ipcMain.handle("get-annotation-overlay-settings", () => {
+	return { success: true, settings: loadAnnotationOverlaySettings() };
+});
+
+ipcMain.handle("set-annotation-overlay-settings", (_event, settings: Partial<AnnotationOverlaySettings>) => {
+	const next = { ...loadAnnotationOverlaySettings(), ...settings };
+	persistAnnotationOverlaySettings(next);
+	return { success: true, settings: next };
+});
 
 /**
  * Keep the HUD's recording controls (Stop/Pause/etc.) reachable while the

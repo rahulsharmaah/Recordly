@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { RecordingSessionData } from "./ipc/types";
+import type { AnnotationOverlaySettings } from "./windows";
 
 type NativeVideoExportWriteResult = { success: boolean; error?: string };
 type NativeVideoAudioMuxMetrics = {
@@ -193,6 +194,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	},
 	annotationOverlaySetIgnoreMouse: (ignore: boolean) => {
 		ipcRenderer.send("annotation-overlay-set-ignore-mouse", ignore);
+	},
+	getAnnotationOverlaySettings: () => {
+		return ipcRenderer.invoke("get-annotation-overlay-settings");
+	},
+	setAnnotationOverlaySettings: (settings: Partial<AnnotationOverlaySettings>) => {
+		return ipcRenderer.invoke("set-annotation-overlay-settings", settings);
 	},
 	getHudOverlayCaptureProtection: () => {
 		return ipcRenderer.invoke("get-hud-overlay-capture-protection");

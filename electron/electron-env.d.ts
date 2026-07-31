@@ -213,6 +213,13 @@ interface Window {
 		annotationOverlayOpen: () => void;
 		annotationOverlayClose: () => void;
 		annotationOverlaySetIgnoreMouse: (ignore: boolean) => void;
+		getAnnotationOverlaySettings: () => Promise<{
+			success: boolean;
+			settings: import("./windows").AnnotationOverlaySettings;
+		}>;
+		setAnnotationOverlaySettings: (
+			settings: Partial<import("./windows").AnnotationOverlaySettings>,
+		) => Promise<{ success: boolean; settings: import("./windows").AnnotationOverlaySettings }>;
 		getHudOverlayCaptureProtection: () => Promise<{ success: boolean; enabled: boolean }>;
 		getHudOverlayMousePassthroughSupported: () => Promise<{
 			success: boolean;
