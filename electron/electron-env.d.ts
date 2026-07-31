@@ -210,6 +210,16 @@ interface Window {
 		hudOverlayClose: () => void;
 		hudOverlayRendererReady: () => void;
 		hudOverlaySetWebcamPreviewVisible: (visible: boolean) => void;
+		annotationOverlayOpen: () => void;
+		annotationOverlayClose: () => void;
+		annotationOverlaySetIgnoreMouse: (ignore: boolean) => void;
+		getAnnotationOverlaySettings: () => Promise<{
+			success: boolean;
+			settings: import("./windows").AnnotationOverlaySettings;
+		}>;
+		setAnnotationOverlaySettings: (
+			settings: Partial<import("./windows").AnnotationOverlaySettings>,
+		) => Promise<{ success: boolean; settings: import("./windows").AnnotationOverlaySettings }>;
 		getHudOverlayCaptureProtection: () => Promise<{ success: boolean; enabled: boolean }>;
 		getHudOverlayMousePassthroughSupported: () => Promise<{
 			success: boolean;
@@ -873,6 +883,8 @@ interface Window {
 		}>;
 		/** Returns the app version from package.json */
 		getAppVersion: () => Promise<string>;
+		getAiAudioSettings: () => Promise<{ success: boolean; provider: string; endpoint: string; hasApiKey: boolean }>;
+		saveAiAudioSettings: (settings: { provider: string; endpoint?: string; apiKey?: string }) => Promise<{ success: boolean; hasApiKey?: boolean; error?: string }>;
 		/** Hide the OS cursor before browser capture starts. */
 		hideOsCursor: () => Promise<{ success: boolean }>;
 		/** Recording preferences (mic, system audio) */

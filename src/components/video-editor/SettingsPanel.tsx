@@ -45,6 +45,7 @@ import { useI18n, useScopedT } from "../../contexts/I18nContext";
 import type { AppLocale } from "../../i18n/config";
 import { SUPPORTED_LOCALES } from "../../i18n/config";
 import { AnnotationSettingsPanel } from "./AnnotationSettingsPanel";
+import { AiAudioSettings } from "./AiAudioSettings";
 import CaptionListPanel from "./CaptionListPanel";
 import type { CaptionRetimeSpan } from "./captionOps";
 import {
@@ -2928,6 +2929,8 @@ export function SettingsPanel({
 						</SelectContent>
 					</Select>
 				</section>
+
+				<AiAudioSettings />
 
 				<section className="flex flex-col gap-1.5">
 					<div className="flex items-center justify-between gap-3 rounded-lg bg-foreground/[0.03] px-2.5 py-2">

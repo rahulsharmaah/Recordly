@@ -35,10 +35,15 @@ let hudOverlaySourceSelectionActive = false;
 let hudOverlayMouseReassertTimer: NodeJS.Timeout | null = null;
 let hudOverlayRecordingActive = false;
 let hudOverlayWebcamPreviewVisible = false;
+let annotationOverlayWindow: BrowserWindow | null = null;
 let countdownWindow: BrowserWindow | null = null;
 let updateToastWindow: BrowserWindow | null = null;
 
 const HUD_OVERLAY_SETTINGS_FILE = path.join(USER_DATA_PATH, "hud-overlay-settings.json");
+const ANNOTATION_OVERLAY_SETTINGS_FILE = path.join(
+	USER_DATA_PATH,
+	"annotation-overlay-settings.json",
+);
 const HUD_EDGE_MARGIN_DIP = 16;
 const UPDATE_TOAST_WIDTH = 456;
 const UPDATE_TOAST_HEIGHT = 252;
@@ -616,6 +621,161 @@ export function createHudOverlayWindow(): BrowserWindow {
 
 export function getHudOverlayWindow(): BrowserWindow | null {
 	return hudOverlayWindow && !hudOverlayWindow.isDestroyed() ? hudOverlayWindow : null;
+}
+
+export interface AnnotationOverlaySettings {
+	tool: string;
+	color: string;
+	sizeScale: number;
+	opacity: number;
+}
+
+const DEFAULT_ANNOTATION_OVERLAY_SETTINGS: AnnotationOverlaySettings = {
+	tool: "brush",
+	color: "#ff3b5c",
+	sizeScale: 1,
+	opacity: 1,
+};
+
+let annotationOverlaySettingsCache: AnnotationOverlaySettings | null = null;
+
+function loadAnnotationOverlaySettings(): AnnotationOverlaySettings {
+	if (annotationOverlaySettingsCache) {
+		return annotationOverlaySettingsCache;
+	}
+
+	try {
+		if (fs.existsSync(ANNOTATION_OVERLAY_SETTINGS_FILE)) {
+			const raw = fs.readFileSync(ANNOTATION_OVERLAY_SETTINGS_FILE, "utf-8");
+			const parsed = JSON.parse(raw) as Partial<AnnotationOverlaySettings>;
+			annotationOverlaySettingsCache = {
+				tool:
+					typeof parsed.tool === "string" ? parsed.tool : DEFAULT_ANNOTATION_OVERLAY_SETTINGS.tool,
+				color:
+					typeof parsed.color === "string"
+						? parsed.color
+						: DEFAULT_ANNOTATION_OVERLAY_SETTINGS.color,
+				sizeScale:
+					typeof parsed.sizeScale === "number"
+						? parsed.sizeScale
+						: DEFAULT_ANNOTATION_OVERLAY_SETTINGS.sizeScale,
+				opacity:
+					typeof parsed.opacity === "number"
+						? parsed.opacity
+						: DEFAULT_ANNOTATION_OVERLAY_SETTINGS.opacity,
+			};
+			return annotationOverlaySettingsCache;
+		}
+	} catch {
+		// Ignore settings read failures and fall back to defaults.
+	}
+
+	annotationOverlaySettingsCache = { ...DEFAULT_ANNOTATION_OVERLAY_SETTINGS };
+	return annotationOverlaySettingsCache;
+}
+
+function persistAnnotationOverlaySettings(settings: AnnotationOverlaySettings): void {
+	annotationOverlaySettingsCache = settings;
+	try {
+		fs.writeFileSync(ANNOTATION_OVERLAY_SETTINGS_FILE, JSON.stringify(settings, null, 2), "utf-8");
+	} catch {
+		// Ignore settings write failures and keep runtime state working.
+	}
+}
+
+ipcMain.handle("get-annotation-overlay-settings", () => {
+	return { success: true, settings: loadAnnotationOverlaySettings() };
+});
+
+ipcMain.handle("set-annotation-overlay-settings", (_event, settings: Partial<AnnotationOverlaySettings>) => {
+	const next = { ...loadAnnotationOverlaySettings(), ...settings };
+	persistAnnotationOverlaySettings(next);
+	return { success: true, settings: next };
+});
+
+/**
+ * Keep the HUD's recording controls (Stop/Pause/etc.) reachable while the
+ * annotation overlay is open. Both windows are alwaysOnTop and the same size
+ * as the display, so whichever one was most recently raised wins hit-testing
+ * everywhere they overlap. The annotation overlay needs to sit on top so the
+ * user can draw anywhere on screen, but that would otherwise permanently bury
+ * the small HUD control bar underneath it. Re-raising the HUD immediately
+ * after the annotation overlay is shown or regains focus (e.g. every time the
+ * user clicks the canvas to draw) restores the HUD to the top of the stack in
+ * between those clicks, so its own bounds remain clickable without disturbing
+ * the click that was just used for drawing.
+ */
+function keepHudOverlayReachableAboveAnnotationOverlay(): void {
+	getHudOverlayWindow()?.moveTop();
+}
+
+export function showAnnotationOverlay(): void {
+	if (annotationOverlayWindow && !annotationOverlayWindow.isDestroyed()) {
+		annotationOverlayWindow.show();
+		annotationOverlayWindow.moveTop();
+		annotationOverlayWindow.focus();
+		keepHudOverlayReachableAboveAnnotationOverlay();
+		return;
+	}
+
+	const hudBounds = getHudOverlayWindow()?.getBounds();
+	const display = hudBounds
+		? getScreen().getDisplayNearestPoint({ x: hudBounds.x, y: hudBounds.y })
+		: getScreen().getPrimaryDisplay();
+	const bounds = display.bounds;
+	const win = new BrowserWindow({
+		x: bounds.x,
+		y: bounds.y,
+		width: bounds.width,
+		height: bounds.height,
+		frame: false,
+		transparent: true,
+		backgroundColor: "#00000000",
+		alwaysOnTop: true,
+		skipTaskbar: true,
+		hasShadow: false,
+		resizable: false,
+		focusable: true,
+		webPreferences: {
+			preload: path.join(electronWindowsDir, "preload.mjs"),
+			nodeIntegration: false,
+			contextIsolation: true,
+			backgroundThrottling: false,
+		},
+	});
+
+	// Keep the annotation UI out of the captured video. Without this the
+	// toolbar, spotlight dimming and the drawings themselves are burned into
+	// the recording, which defeats the point of an overlay the presenter uses
+	// live. Mirrors the HUD's own capture protection.
+	if (isHudOverlayCaptureProtectionSupported()) {
+		win.setContentProtection(true);
+	}
+
+	annotationOverlayWindow = win;
+	win.on("show", keepHudOverlayReachableAboveAnnotationOverlay);
+	win.on("focus", keepHudOverlayReachableAboveAnnotationOverlay);
+	win.on("closed", () => {
+		if (annotationOverlayWindow === win) annotationOverlayWindow = null;
+		reassertHudOverlayMousePassthrough();
+	});
+	if (VITE_DEV_SERVER_URL) {
+		win.loadURL(`${VITE_DEV_SERVER_URL}?windowType=annotation-overlay`);
+	} else {
+		win.loadFile(path.join(RENDERER_DIST, "index.html"), {
+			query: { windowType: "annotation-overlay" },
+		});
+	}
+
+	keepHudOverlayReachableAboveAnnotationOverlay();
+}
+
+export function closeAnnotationOverlay(): void {
+	annotationOverlayWindow?.close();
+}
+
+export function setAnnotationOverlayIgnoreMouse(ignore: boolean): void {
+	annotationOverlayWindow?.setIgnoreMouseEvents(ignore, { forward: true });
 }
 
 /**

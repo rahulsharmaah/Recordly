@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { CountdownOverlay } from "./components/countdown/CountdownOverlay";
+import { AnnotationOverlay } from "./components/annotation/AnnotationOverlay";
 import { LaunchWindow } from "./components/launch/LaunchWindow";
 import { SourceSelector } from "./components/launch/SourceSelector";
 import { UpdateToastWindow } from "./components/launch/UpdateToastWindow";
@@ -24,6 +25,7 @@ export default function App() {
 
 		if (
 			type === "hud-overlay" ||
+			type === "annotation-overlay" ||
 			type === "source-selector" ||
 			type === "countdown" ||
 			(type === "update-toast" && isMacOS)
@@ -68,6 +70,8 @@ export default function App() {
 			return <SourceSelector />;
 		case "countdown":
 			return <CountdownOverlay />;
+		case "annotation-overlay":
+			return <AnnotationOverlay />;
 		case "update-toast":
 			return <UpdateToastWindow />;
 		case "editor":

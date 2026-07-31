@@ -348,6 +348,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 	const nativeScreenRecording = useRef(false);
 	const nativeWindowsRecording = useRef(false);
 	const startInFlight = useRef(false);
+	const stopInFlight = useRef(false);
 	const hasPromptedForReselect = useRef(false);
 	const hasShownNativeWindowsFallbackToast = useRef(false);
 	const countdownDelayLoaded = useRef(false);
@@ -1067,6 +1068,10 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 	}, []);
 
 	const stopRecording = useRef(() => {
+		if (stopInFlight.current) {
+			return;
+		}
+		stopInFlight.current = true;
 		setPaused(false);
 		if (nativeScreenRecording.current) {
 			nativeScreenRecording.current = false;
@@ -1212,7 +1217,10 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 			setRecording(false);
 			setFinalizing(true);
 			window.electronAPI?.setRecordingState(false);
+			return;
 		}
+
+		stopInFlight.current = false;
 	});
 
 	useEffect(() => {
@@ -1372,6 +1380,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 
 		hasPromptedForReselect.current = false;
 		startInFlight.current = true;
+		stopInFlight.current = false;
 		setStarting(true);
 
 		try {

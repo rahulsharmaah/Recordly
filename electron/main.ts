@@ -52,12 +52,15 @@ import {
 	createEditorWindow,
 	createHudOverlayWindow,
 	createSourceSelectorWindow,
+	closeAnnotationOverlay,
 	getHudOverlayWindow,
 	getUpdateToastWindow,
 	hideUpdateToastWindow,
 	isHudOverlayMousePassthroughSupported,
 	reassertHudOverlayMousePassthrough as reassertHudOverlayMouseState,
 	setHudOverlayRecordingActive,
+	setAnnotationOverlayIgnoreMouse,
+	showAnnotationOverlay,
 	showUpdateToastWindow,
 } from "./windows";
 
@@ -380,6 +383,27 @@ function focusOrCreateMainWindow() {
 
 function isEditorWindow(window: BrowserWindow) {
 	return window.webContents.getURL().includes("windowType=editor");
+}
+
+/**
+ * Hide the Recordly editor from screen capture while a recording is running.
+ *
+ * The editor is an ordinary window, so recording a full screen captures it too
+ * — the user ends up with Recordly's own timeline and preview burned into the
+ * footage. Content protection is toggled rather than left permanently on so
+ * the editor is still capturable outside of recording (screen shares, demos of
+ * Recordly itself).
+ */
+function setEditorWindowsHiddenFromCapture(hidden: boolean) {
+	if (process.platform === "linux") {
+		return;
+	}
+
+	for (const window of BrowserWindow.getAllWindows()) {
+		if (!window.isDestroyed() && isEditorWindow(window)) {
+			window.setContentProtection(hidden);
+		}
+	}
 }
 
 function sendEditorMenuAction(
@@ -1002,6 +1026,12 @@ app.whenReady().then(async () => {
 			}
 		}, 100);
 	});
+
+	ipcMain.on("annotation-overlay-open", () => showAnnotationOverlay());
+	ipcMain.on("annotation-overlay-close", () => closeAnnotationOverlay());
+	ipcMain.on("annotation-overlay-set-ignore-mouse", (_event, ignore: boolean) => {
+		setAnnotationOverlayIgnoreMouse(Boolean(ignore));
+	});
 	syncDockIcon();
 	createTray();
 	updateTrayMenu();
@@ -1031,6 +1061,7 @@ app.whenReady().then(async () => {
 		(recording: boolean, sourceName: string) => {
 			selectedSourceName = sourceName;
 			setHudOverlayRecordingActive(recording);
+			setEditorWindowsHiddenFromCapture(recording);
 			if (!tray) createTray();
 			updateTrayMenu(recording);
 			if (recording) {
@@ -1038,6 +1069,7 @@ app.whenReady().then(async () => {
 			}
 			if (!recording) {
 				restoreWindowSafely(mainWindow);
+				closeAnnotationOverlay();
 			}
 		},
 	);

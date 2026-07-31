@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { RecordingSessionData } from "./ipc/types";
+import type { AnnotationOverlaySettings } from "./windows";
 
 type NativeVideoExportWriteResult = { success: boolean; error?: string };
 type NativeVideoAudioMuxMetrics = {
@@ -184,6 +185,21 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	},
 	hudOverlaySetWebcamPreviewVisible: (visible: boolean) => {
 		ipcRenderer.send("hud-overlay-set-webcam-preview-visible", visible);
+	},
+	annotationOverlayOpen: () => {
+		ipcRenderer.send("annotation-overlay-open");
+	},
+	annotationOverlayClose: () => {
+		ipcRenderer.send("annotation-overlay-close");
+	},
+	annotationOverlaySetIgnoreMouse: (ignore: boolean) => {
+		ipcRenderer.send("annotation-overlay-set-ignore-mouse", ignore);
+	},
+	getAnnotationOverlaySettings: () => {
+		return ipcRenderer.invoke("get-annotation-overlay-settings");
+	},
+	setAnnotationOverlaySettings: (settings: Partial<AnnotationOverlaySettings>) => {
+		return ipcRenderer.invoke("set-annotation-overlay-settings", settings);
 	},
 	getHudOverlayCaptureProtection: () => {
 		return ipcRenderer.invoke("get-hud-overlay-capture-protection");
@@ -966,6 +982,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
 		ipcRenderer.invoke("mux-native-windows-recording", expectedDurationMs),
 	hideOsCursor: () => ipcRenderer.invoke("hide-cursor"),
 	getAppVersion: () => ipcRenderer.invoke("app:getVersion"),
+	getAiAudioSettings: () => ipcRenderer.invoke("ai-audio-settings:get"),
+	saveAiAudioSettings: (settings: { provider: string; endpoint?: string; apiKey?: string }) => ipcRenderer.invoke("ai-audio-settings:save", settings),
 	getRecordingPreferences: () => ipcRenderer.invoke("get-recording-preferences"),
 	getRecordingAudioLabConfig: () => ipcRenderer.invoke("get-recording-audio-lab-config"),
 	setRecordingPreferences: (prefs: {

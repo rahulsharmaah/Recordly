@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import fs from "node:fs/promises";
-import { app, ipcMain } from "electron";
+import { app, ipcMain, safeStorage } from "electron";
+import path from "node:path";
 import { hideCursor } from "../../cursorHider";
 import { closeCountdownWindow, createCountdownWindow, getCountdownWindow } from "../../windows";
 import {
@@ -30,6 +31,7 @@ const BROWSER_MICROPHONE_PROFILES = new Set([
 	"no-noise-suppression",
 	"raw",
 ]);
+const AI_AUDIO_SETTINGS_FILE = path.join(app.getPath("userData"), "ai-audio-settings.json");
 
 function getBrowserMicrophoneProfileFromEnv() {
 	const requested = process.env[BROWSER_MICROPHONE_PROFILE_ENV]?.trim() || null;
@@ -65,6 +67,28 @@ function hasAppSetting(store: Record<string, unknown>, key: string): boolean {
 }
 
 export function registerSettingsHandlers() {
+	ipcMain.handle("ai-audio-settings:get", async () => {
+		try {
+			const saved = JSON.parse(await fs.readFile(AI_AUDIO_SETTINGS_FILE, "utf8")) as Record<string, unknown>;
+			return { success: true, provider: typeof saved.provider === "string" ? saved.provider : "openai", endpoint: typeof saved.endpoint === "string" ? saved.endpoint : "", hasApiKey: typeof saved.apiKey === "string" && saved.apiKey.length > 0 };
+		} catch {
+			return { success: true, provider: "openai", endpoint: "", hasApiKey: false };
+		}
+	});
+	ipcMain.handle("ai-audio-settings:save", async (_event, input: unknown) => {
+		if (!input || typeof input !== "object") return { success: false, error: "Invalid AI audio settings" };
+		const value = input as { provider?: unknown; endpoint?: unknown; apiKey?: unknown };
+		const provider = typeof value.provider === "string" && ["openai", "elevenlabs", "custom"].includes(value.provider) ? value.provider : "openai";
+		const endpoint = typeof value.endpoint === "string" ? value.endpoint.trim() : "";
+		const apiKey = typeof value.apiKey === "string" ? value.apiKey.trim() : "";
+		try {
+			const encryptedKey = apiKey && safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(apiKey).toString("base64") : "";
+			await fs.writeFile(AI_AUDIO_SETTINGS_FILE, JSON.stringify({ provider, endpoint, apiKey: encryptedKey }, null, 2), "utf8");
+			return { success: true, hasApiKey: Boolean(encryptedKey) };
+		} catch (error) {
+			return { success: false, error: error instanceof Error ? error.message : "Failed to save AI audio settings" };
+		}
+	});
 	ipcMain.handle("app:getVersion", () => {
 		return app.getVersion();
 	});
