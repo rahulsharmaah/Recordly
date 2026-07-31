@@ -1,7 +1,7 @@
 import { CircleIcon, EraserIcon, PencilSimpleLineIcon, RectangleIcon, XIcon } from "@phosphor-icons/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-type Tool = "pen" | "circle" | "rectangle";
+type Tool = "pencil" | "brush" | "highlighter" | "circle" | "rectangle";
 type Point = { x: number; y: number };
 type Mark = { id: number; tool: Tool; color: string; points: Point[] };
 
@@ -25,10 +25,11 @@ function drawMark(ctx: CanvasRenderingContext2D, mark: Mark) {
 	const [start, end = start] = mark.points;
 	ctx.beginPath();
 	ctx.strokeStyle = mark.color;
-	ctx.lineWidth = 7;
+	ctx.globalAlpha = mark.tool === "highlighter" ? 0.32 : 1;
+	ctx.lineWidth = mark.tool === "pencil" ? 3 : mark.tool === "highlighter" ? 20 : 8;
 	ctx.lineCap = "round";
 	ctx.lineJoin = "round";
-	if (mark.tool === "pen") {
+	if (mark.tool === "pencil" || mark.tool === "brush" || mark.tool === "highlighter") {
 		ctx.moveTo(start.x, start.y);
 		for (let index = 1; index < mark.points.length - 1; index += 1) {
 			const point = mark.points[index];
@@ -42,10 +43,11 @@ function drawMark(ctx: CanvasRenderingContext2D, mark: Mark) {
 		drawHandDrawnCircle(ctx, start, end);
 	}
 	ctx.stroke();
+	ctx.globalAlpha = 1;
 }
 
 export function AnnotationOverlay() {
-	const [tool, setTool] = useState<Tool>("pen");
+	const [tool, setTool] = useState<Tool>("brush");
 	const [color, setColor] = useState(COLORS[0]);
 	const [marks, setMarks] = useState<Mark[]>([]);
 	const activeMark = useRef<Mark | null>(null);
@@ -110,14 +112,14 @@ export function AnnotationOverlay() {
 	return (
 		<div style={{ width: "100vw", height: "100vh", cursor: "crosshair", userSelect: "none" }}>
 			<div style={{ position: "fixed", top: 20, left: "50%", transform: "translateX(-50%)", display: "flex", alignItems: "center", gap: 8, padding: 8, borderRadius: 14, background: "rgba(17, 24, 39, .92)", color: "white", boxShadow: "0 10px 32px rgba(0,0,0,.35)", zIndex: 2 }}>
-				{([ ["pen", "Draw", PencilSimpleLineIcon], ["circle", "Circle", CircleIcon], ["rectangle", "Box", RectangleIcon] ] as const).map(([value, label, Icon]) => <button key={value} type="button" onClick={() => setTool(value)} title={label} style={{ display: "flex", alignItems: "center", gap: 5, border: 0, borderRadius: 8, padding: "7px 9px", color: tool === value ? "#fff" : "#aab3c2", background: tool === value ? "#2676ff" : "transparent", fontWeight: 700, fontSize: 12 }}><Icon size={17} />{label}</button>)}
+				{([ ["pencil", "Pencil", PencilSimpleLineIcon], ["brush", "Brush", PencilSimpleLineIcon], ["highlighter", "Highlight", PencilSimpleLineIcon], ["circle", "Circle", CircleIcon], ["rectangle", "Box", RectangleIcon] ] as const).map(([value, label, Icon]) => <button key={value} type="button" onClick={() => setTool(value)} title={label} style={{ display: "flex", alignItems: "center", gap: 5, border: 0, borderRadius: 8, padding: "7px 9px", color: tool === value ? "#fff" : "#aab3c2", background: tool === value ? "#2676ff" : "transparent", fontWeight: 700, fontSize: 12 }}><Icon size={17} />{label}</button>)}
 				<span style={{ width: 1, height: 24, background: "#475569" }} />
 				{COLORS.map((value) => <button key={value} type="button" onClick={() => setColor(value)} aria-label={`Use ${value}`} style={{ width: 20, height: 20, borderRadius: "50%", border: color === value ? "2px solid white" : "2px solid transparent", background: value }} />)}
 				<button type="button" onClick={() => setMarks([])} title="Clear" style={{ border: 0, background: "transparent", color: "#d1d5db", padding: 7 }}><EraserIcon size={18} /></button>
 				<button type="button" onClick={() => window.electronAPI?.annotationOverlayClose?.()} title="Close (Esc)" style={{ border: 0, background: "transparent", color: "#d1d5db", padding: 7 }}><XIcon size={18} /></button>
 			</div>
 			<canvas ref={canvasRef} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={finishMark} onPointerCancel={finishMark} />
-			<div style={{ position: "fixed", bottom: 22, left: "50%", transform: "translateX(-50%)", color: "white", font: "600 12px system-ui", textShadow: "0 1px 3px #000" }}>Choose Draw, Circle, or Box · one mark fades automatically · Esc to cancel</div>
+			<div style={{ position: "fixed", bottom: 22, left: "50%", transform: "translateX(-50%)", color: "white", font: "600 12px system-ui", textShadow: "0 1px 3px #000" }}>Pencil, Brush, Highlight, Circle, or Box · one mark fades automatically · Esc to cancel</div>
 		</div>
 	);
 }
