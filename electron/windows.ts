@@ -619,11 +619,28 @@ export function getHudOverlayWindow(): BrowserWindow | null {
 	return hudOverlayWindow && !hudOverlayWindow.isDestroyed() ? hudOverlayWindow : null;
 }
 
+/**
+ * Keep the HUD's recording controls (Stop/Pause/etc.) reachable while the
+ * annotation overlay is open. Both windows are alwaysOnTop and the same size
+ * as the display, so whichever one was most recently raised wins hit-testing
+ * everywhere they overlap. The annotation overlay needs to sit on top so the
+ * user can draw anywhere on screen, but that would otherwise permanently bury
+ * the small HUD control bar underneath it. Re-raising the HUD immediately
+ * after the annotation overlay is shown or regains focus (e.g. every time the
+ * user clicks the canvas to draw) restores the HUD to the top of the stack in
+ * between those clicks, so its own bounds remain clickable without disturbing
+ * the click that was just used for drawing.
+ */
+function keepHudOverlayReachableAboveAnnotationOverlay(): void {
+	getHudOverlayWindow()?.moveTop();
+}
+
 export function showAnnotationOverlay(): void {
 	if (annotationOverlayWindow && !annotationOverlayWindow.isDestroyed()) {
 		annotationOverlayWindow.show();
 		annotationOverlayWindow.moveTop();
 		annotationOverlayWindow.focus();
+		keepHudOverlayReachableAboveAnnotationOverlay();
 		return;
 	}
 
@@ -654,6 +671,8 @@ export function showAnnotationOverlay(): void {
 	});
 
 	annotationOverlayWindow = win;
+	win.on("show", keepHudOverlayReachableAboveAnnotationOverlay);
+	win.on("focus", keepHudOverlayReachableAboveAnnotationOverlay);
 	win.on("closed", () => {
 		if (annotationOverlayWindow === win) annotationOverlayWindow = null;
 		reassertHudOverlayMousePassthrough();
@@ -665,6 +684,8 @@ export function showAnnotationOverlay(): void {
 			query: { windowType: "annotation-overlay" },
 		});
 	}
+
+	keepHudOverlayReachableAboveAnnotationOverlay();
 }
 
 export function closeAnnotationOverlay(): void {

@@ -1047,6 +1047,7 @@ app.whenReady().then(async () => {
 			}
 			if (!recording) {
 				restoreWindowSafely(mainWindow);
+				closeAnnotationOverlay();
 			}
 		},
 	);
