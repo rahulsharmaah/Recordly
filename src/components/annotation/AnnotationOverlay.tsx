@@ -63,12 +63,8 @@ export function AnnotationOverlay() {
 		if (!mark) return;
 		activeMark.current = null;
 		setMarks((current) => [...current, mark]);
-		// The finished mark stays visible but immediately becomes click-through, so
-		// the recording HUD (including Stop) remains usable while it fades away.
-		window.electronAPI?.annotationOverlaySetIgnoreMouse?.(true);
 		window.setTimeout(() => {
 			removeMark(mark.id);
-			window.electronAPI?.annotationOverlayClose?.();
 		}, FADE_AFTER_MS);
 	}, [removeMark]);
 
@@ -126,7 +122,7 @@ export function AnnotationOverlay() {
 				<button type="button" onClick={() => window.electronAPI?.annotationOverlayClose?.()} title="Close (Esc)" style={{ border: 0, background: "transparent", color: "#d1d5db", padding: 7 }}><XIcon size={18} /></button>
 			</div>
 			<canvas ref={canvasRef} style={{ display: "block", touchAction: "none" }} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={finishMark} onPointerCancel={finishMark} />
-			<div style={{ position: "fixed", bottom: 22, left: "50%", transform: "translateX(-50%)", color: "white", font: "600 12px system-ui", textShadow: "0 1px 3px #000" }}>Pencil, Brush, Highlight, Circle, or Box · one mark fades automatically · Esc to cancel</div>
+			<div style={{ position: "fixed", bottom: 22, left: "50%", transform: "translateX(-50%)", color: "white", font: "600 12px system-ui", textShadow: "0 1px 3px #000" }}>Draw as many marks as you need · each fades automatically · Esc when you are done</div>
 		</div>
 	);
 }
