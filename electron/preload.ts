@@ -975,6 +975,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
 		ipcRenderer.invoke("mux-native-windows-recording", expectedDurationMs),
 	hideOsCursor: () => ipcRenderer.invoke("hide-cursor"),
 	getAppVersion: () => ipcRenderer.invoke("app:getVersion"),
+	getAiAudioSettings: () => ipcRenderer.invoke("ai-audio-settings:get"),
+	saveAiAudioSettings: (settings: { provider: string; endpoint?: string; apiKey?: string }) => ipcRenderer.invoke("ai-audio-settings:save", settings),
 	getRecordingPreferences: () => ipcRenderer.invoke("get-recording-preferences"),
 	getRecordingAudioLabConfig: () => ipcRenderer.invoke("get-recording-audio-lab-config"),
 	setRecordingPreferences: (prefs: {
