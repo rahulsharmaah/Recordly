@@ -73,6 +73,11 @@ const HOLD_MS = 850;
 const FADE_MS = 650;
 const SHAPE_LINE_WIDTH = 3.5;
 const TEXT_BASE_FONT_SIZE = 26;
+// Kept deliberately low so screen content stays readable through the mark. The
+// stroke must be painted with plain source-over: this canvas is transparent, so
+// a "multiply" blend has only the transparent-black backdrop to blend against
+// and darkens the stroke toward black instead of tinting what is underneath.
+const HIGHLIGHTER_ALPHA = 0.35;
 const SETTINGS_SAVE_DEBOUNCE_MS = 300;
 
 const STROKE_WIDTH: Record<FreehandTool, { base: number; min: number; taper: number }> = {
@@ -242,8 +247,7 @@ function paintMark(ctx: CanvasRenderingContext2D, mark: Mark, fadeOpacity: numbe
 	ctx.save();
 	if (mark.kind === "stroke") {
 		if (mark.tool === "highlighter") {
-			ctx.globalCompositeOperation = "multiply";
-			ctx.globalAlpha = 0.5 * fadeOpacity * mark.baseOpacity;
+			ctx.globalAlpha = HIGHLIGHTER_ALPHA * fadeOpacity * mark.baseOpacity;
 			paintUniformStrokePath(ctx, mark.color, mark.points, mark.widths[0]);
 		} else {
 			ctx.globalAlpha = fadeOpacity * mark.baseOpacity;
@@ -665,8 +669,7 @@ export function AnnotationOverlay() {
 			if (ctx && stroke.tool === "highlighter") {
 				clearActiveCanvas();
 				ctx.save();
-				ctx.globalCompositeOperation = "multiply";
-				ctx.globalAlpha = 0.5 * stroke.opacity;
+				ctx.globalAlpha = HIGHLIGHTER_ALPHA * stroke.opacity;
 				paintUniformStrokePath(ctx, stroke.color, stroke.points, stroke.widths[0]);
 				ctx.restore();
 			}
