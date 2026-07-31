@@ -52,6 +52,7 @@ export function AnnotationOverlay() {
 	const [marks, setMarks] = useState<Mark[]>([]);
 	const activeMark = useRef<Mark | null>(null);
 	const canvasRef = useRef<HTMLCanvasElement>(null);
+	const paintFrame = useRef<number | null>(null);
 
 	const removeMark = useCallback((id: number) => {
 		setMarks((current) => current.filter((mark) => mark.id !== id));
@@ -94,19 +95,25 @@ export function AnnotationOverlay() {
 		if (activeMark.current) drawMark(context, activeMark.current);
 	}, [marks]);
 
-	const pointFor = (event: React.PointerEvent<HTMLCanvasElement>): Point => {
-		const rect = event.currentTarget.getBoundingClientRect();
-		return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+	const pointFor = (clientX: number, clientY: number, rect: DOMRect): Point => {
+		return { x: clientX - rect.left, y: clientY - rect.top };
 	};
 	const onPointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
 		if (event.button !== 0) return;
 		event.currentTarget.setPointerCapture(event.pointerId);
-		activeMark.current = { id: Date.now(), tool, color, points: [pointFor(event)] };
+		const rect = event.currentTarget.getBoundingClientRect();
+		activeMark.current = { id: Date.now(), tool, color, points: [pointFor(event.clientX, event.clientY, rect)] };
 	};
 	const onPointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
 		if (!activeMark.current) return;
-		activeMark.current.points.push(pointFor(event));
-		setMarks((current) => [...current]);
+		const rect = event.currentTarget.getBoundingClientRect();
+		const samples = event.nativeEvent.getCoalescedEvents?.() ?? [event.nativeEvent];
+		for (const sample of samples) activeMark.current.points.push(pointFor(sample.clientX, sample.clientY, rect));
+		if (paintFrame.current !== null) return;
+		paintFrame.current = requestAnimationFrame(() => {
+			paintFrame.current = null;
+			setMarks((current) => [...current]);
+		});
 	};
 
 	return (
@@ -118,7 +125,7 @@ export function AnnotationOverlay() {
 				<button type="button" onClick={() => setMarks([])} title="Clear" style={{ border: 0, background: "transparent", color: "#d1d5db", padding: 7 }}><EraserIcon size={18} /></button>
 				<button type="button" onClick={() => window.electronAPI?.annotationOverlayClose?.()} title="Close (Esc)" style={{ border: 0, background: "transparent", color: "#d1d5db", padding: 7 }}><XIcon size={18} /></button>
 			</div>
-			<canvas ref={canvasRef} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={finishMark} onPointerCancel={finishMark} />
+			<canvas ref={canvasRef} style={{ display: "block", touchAction: "none" }} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={finishMark} onPointerCancel={finishMark} />
 			<div style={{ position: "fixed", bottom: 22, left: "50%", transform: "translateX(-50%)", color: "white", font: "600 12px system-ui", textShadow: "0 1px 3px #000" }}>Pencil, Brush, Highlight, Circle, or Box · one mark fades automatically · Esc to cancel</div>
 		</div>
 	);
